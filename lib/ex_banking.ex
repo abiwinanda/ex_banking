@@ -61,6 +61,9 @@ defmodule ExBanking do
            {:deposit, Accounts.deposit(user, amount, currency)} do
       {:ok, new_balance}
     else
+      {:does_user_exist, {:ok, nil}} ->
+        {:error, :user_does_not_exist}
+
       {:does_user_exist, error} ->
         error
 
@@ -80,6 +83,9 @@ defmodule ExBanking do
            {:withdraw, Accounts.withdraw(user, amount, currency)} do
       {:ok, new_balance}
     else
+      {:does_user_exist, {:ok, nil}} ->
+        {:error, :user_does_not_exist}
+
       {:does_user_exist, error} ->
         error
 
@@ -99,6 +105,9 @@ defmodule ExBanking do
            {:get_balance, Accounts.get_balance(user, currency)} do
       {:ok, balance}
     else
+      {:does_user_exist, {:ok, nil}} ->
+        {:error, :user_does_not_exist}
+
       {:does_user_exist, error} ->
         error
 
@@ -121,8 +130,14 @@ defmodule ExBanking do
            {:send_balance, Accounts.send(from_user, to_user, amount, currency)} do
       {:ok, sender_new_balance, receiver_new_balance}
     else
+      {:does_sender_exist, {:ok, nil}} ->
+        {:error, :sender_does_not_exist}
+
       {:does_sender_exist, error} ->
         error
+
+      {:does_receiver_exist, {:ok, nil}} ->
+        {:error, :receiver_does_not_exist}
 
       {:does_receiver_exist, error} ->
         error
