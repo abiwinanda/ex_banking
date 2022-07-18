@@ -4,6 +4,9 @@ defmodule ExBanking.Accounts.Account do
   require Decimal
   alias ExBanking.AccountRegistry
 
+  # used to simulate time to process an operation
+  @processtime 100
+
   defmodule State do
     defstruct balance: Decimal.new(0)
   end
@@ -46,11 +49,16 @@ defmodule ExBanking.Accounts.Account do
 
   def handle_call({:deposit, amount}, _from, %State{balance: balance} = state) do
     new_balance = Decimal.add(balance, to_decimal(amount))
+
+    :timer.sleep(@processtime)
+
     {:reply, {:ok, decimal_to_float(new_balance)}, %State{state | balance: new_balance}}
   end
 
   def handle_call({:withdraw, amount}, _from, %State{balance: balance} = state) do
     new_balance = Decimal.sub(balance, to_decimal(amount))
+
+    :timer.sleep(@processtime)
 
     case Decimal.negative?(new_balance) do
       false ->
@@ -61,8 +69,10 @@ defmodule ExBanking.Accounts.Account do
     end
   end
 
-  def handle_call(:get_balance, _from, %State{balance: balance} = state),
-    do: {:reply, {:ok, decimal_to_float(balance)}, state}
+  def handle_call(:get_balance, _from, %State{balance: balance} = state) do
+    :timer.sleep(@processtime)
+    {:reply, {:ok, decimal_to_float(balance)}, state}
+  end
 
   ###########
   # Helpers #
