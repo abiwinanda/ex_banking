@@ -2,6 +2,7 @@ defmodule ExBanking do
   @moduledoc """
   TODO
   """
+  alias ExBanking.{Users, Accounts}
 
   @type user :: String.t()
   @type currency :: String.t()
@@ -39,28 +40,71 @@ defmodule ExBanking do
   TODO
   """
   @spec create_user(user) :: :ok | create_user_error
-  def create_user(_user) do
+  def create_user(user) do
+    with {:create_user, {:ok, _}} <-
+           {:create_user, Users.create_user(user)} do
+      :ok
+    else
+      {:create_user, error} ->
+        error
+    end
   end
 
   @doc """
   TODO
   """
   @spec deposit(user, amount, currency) :: {:ok, new_balance :: number} | deposit_error
-  def deposit(_user, _amount, _currency) do
+  def deposit(user, amount, currency) do
+    with {:does_user_exist, {:ok, pid}} when is_pid(pid) <-
+           {:does_user_exist, Users.get_user_pid(user)},
+         {:deposit, {:ok, new_balance}} <-
+           {:deposit, Accounts.deposit(user, amount, currency)} do
+      {:ok, new_balance}
+    else
+      {:does_user_exist, error} ->
+        error
+
+      {:deposit, error} ->
+        error
+    end
   end
 
   @doc """
   TODO
   """
   @spec withdraw(user, amount, currency) :: {:ok, new_balance :: number} | withdraw_error
-  def withdraw(_user, _amount, _currency) do
+  def withdraw(user, amount, currency) do
+    with {:does_user_exist, {:ok, pid}} when is_pid(pid) <-
+           {:does_user_exist, Users.get_user_pid(user)},
+         {:withdraw, {:ok, new_balance}} <-
+           {:withdraw, Accounts.withdraw(user, amount, currency)} do
+      {:ok, new_balance}
+    else
+      {:does_user_exist, error} ->
+        error
+
+      {:withdraw, error} ->
+        error
+    end
   end
 
   @doc """
   TODO
   """
   @spec get_balance(user, currency) :: {:ok, balance :: number} | get_balance_error
-  def get_balance(_user, _currency) do
+  def get_balance(user, currency) do
+    with {:does_user_exist, {:ok, pid}} when is_pid(pid) <-
+           {:does_user_exist, Users.get_user_pid(user)},
+         {:get_balance, {:ok, balance}} <-
+           {:get_balance, Accounts.get_balance(user, currency)} do
+      {:ok, balance}
+    else
+      {:does_user_exist, error} ->
+        error
+
+      {:get_balance, error} ->
+        error
+    end
   end
 
   @doc """
@@ -68,6 +112,23 @@ defmodule ExBanking do
   """
   @spec send(from_user :: user, to_user :: user, amount, currency) ::
           {:ok, from_user_balance :: number, to_user_balance :: number} | send_error
-  def send(_from_user, _to_user, _amount, _currency) do
+  def send(from_user, to_user, amount, currency) do
+    with {:does_sender_exist, {:ok, pid}} when is_pid(pid) <-
+           {:does_sender_exist, Users.get_user_pid(from_user)},
+         {:does_receiver_exist, {:ok, pid}} when is_pid(pid) <-
+           {:does_receiver_exist, Users.get_user_pid(from_user)},
+         {:send_balance, {:ok, sender_new_balance, receiver_new_balance}} <-
+           {:send_balance, Accounts.send(from_user, to_user, amount, currency)} do
+      {:ok, sender_new_balance, receiver_new_balance}
+    else
+      {:does_sender_exist, error} ->
+        error
+
+      {:does_receiver_exist, error} ->
+        error
+
+      {:send_balance, error} ->
+        error
+    end
   end
 end
