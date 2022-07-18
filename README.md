@@ -35,8 +35,9 @@ by following the official [elixir installation guide](https://elixir-lang.org/in
 
 ### Start Application
 
-1. Install the required dependencies by running `mix deps.get`.
-2. Start the application in iex by running `iex -S mix`.
+1. Clone the repo.
+2. Install the required dependencies by running `mix deps.get`.
+3. Start the application in iex by running `iex -S mix`.
 
 ### Run Unit Test
 
