@@ -9,7 +9,9 @@ defmodule ExBanking.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: ExBanking.UserRegistry},
-      {DynamicSupervisor, strategy: :one_for_one, name: ExBanking.UserManager}
+      {Registry, keys: :unique, name: ExBanking.AccountRegistry},
+      {DynamicSupervisor, strategy: :one_for_one, name: ExBanking.UserManager},
+      {DynamicSupervisor, strategy: :one_for_one, name: ExBanking.AccountManager}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
