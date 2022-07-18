@@ -1,10 +1,33 @@
 defmodule ExBanking.Accounts do
   @moduledoc """
-  TODO
+  `ExBanking.Users` provides sets of functions to manage user's account related data in the bank.
   """
   alias ExBanking.AccountManager
   alias ExBanking.Users.User
   alias ExBanking.Accounts.{AccountSupervisor, Account}
+
+  @type user :: String.t()
+  @type currency :: String.t()
+  @type amount :: number
+  @type deposit_error ::
+          {:error,
+           :wrong_arguments
+           | :too_many_requests_to_user}
+  @type withdraw_error ::
+          {:error,
+           :wrong_arguments
+           | :not_enough_money
+           | :too_many_requests_to_user}
+  @type get_balance_error ::
+          {:error,
+           :wrong_arguments
+           | :too_many_requests_to_user}
+  @type send_error ::
+          {:error,
+           :wrong_arguments
+           | :not_enough_money
+           | :too_many_requests_to_sender
+           | :too_many_requests_to_receiver}
 
   defguard is_valid_user(user) when is_binary(user) and user != ""
   defguard is_valid_currency(currency) when is_binary(currency) and currency != ""
@@ -20,8 +43,23 @@ defmodule ExBanking.Accounts do
       )
 
   @doc """
-  TODO
+  Deposit money of a specific currency to a user's account. If the account is not yet exists,
+  a new account will be created automatically. The account new balance will be returned on success
+  and it will always be rounded to two decimal places down.
+
+  ## Examples
+
+      iex> deposit("user", 500.505, "EUR")
+      {:ok, 500.50}
+
+      iex> deposit("user", 123.123, "IDR")
+      {:ok, 123.12}
+
+      iex> deposit("user", "500.505", "EUR")
+      {:error, :wrong_arguments}
+
   """
+  @spec deposit(user, amount, currency) :: {:ok, new_balance :: number} | deposit_error
   def deposit(user, amount, currency)
       when is_valid_user(user) and is_valid_amount(amount, currency) do
     with {:ensure_currency_account_exists, _} <-
@@ -45,8 +83,26 @@ defmodule ExBanking.Accounts do
   def deposit(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
   @doc """
-  TODO
+  Withdraw money of a specific currency from a user's account. If the account is not yet exists,
+  the balance will be assumed 0 and `:not_enough_money` error will be returned. The account new balance
+  will be returned on success and it will always be rounded to two decimal places down.
+
+  ## Examples
+
+      iex> withdraw("user", 100, "EUR")
+      {:ok, 400.50}
+
+      iex> withdraw("user", 5000, "IDR")
+      {:error, :not_enough_money}
+
+      iex> withdraw("user", 5000, "NON_EXISTING_CURRENCY")
+      {:error, :not_enough_money}
+
+      iex> withdraw("user", "500", "EUR")
+      {:error, :wrong_arguments}
+
   """
+  @spec withdraw(user, amount, currency) :: {:ok, new_balance :: number} | withdraw_error
   def withdraw(user, amount, currency)
       when is_valid_user(user) and is_valid_amount(amount, currency) do
     with {:enqueue_operation, {:ok, _}} <-
@@ -73,8 +129,22 @@ defmodule ExBanking.Accounts do
   def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
   @doc """
-  TODO
+  Get balance of a specific currency from a user's account. If the account is not yet exists,
+  0 will be returned. The account balance will always be rounded to two decimal places down.
+
+  ## Examples
+
+      iex> get_balance("user", "EUR")
+      {:ok, 400.50}
+
+      iex> get_balance("user", "NON_EXISTING_CURRENCY")
+      {:ok, 0}
+
+      iex> get_balance("user", :EUR)
+      {:error, :wrong_arguments}
+
   """
+  @spec get_balance(user, currency) :: {:ok, new_balance :: number} | get_balance_error
   def get_balance(user, currency)
       when is_valid_user(user) and is_valid_currency(currency) do
     with {:enqueue_operation, {:ok, _}} <-
@@ -101,8 +171,27 @@ defmodule ExBanking.Accounts do
   def get_balance(_user, _currency), do: {:error, :wrong_arguments}
 
   @doc """
-  TODO
+  Send money from a sender's account to a receiver's account. If the sender tries to send money from an account
+  that is not yet exists, the balance will be assumed 0 and `:not_enough_money` error will be returned. The sender
+  and receiver new balance will be returned on success and they will always be rounded to two decimal places down.
+
+  ## Examples
+
+      iex> send("sender", "receiver", 500, "EUR")
+      {:ok, 200.50, 600.30}
+
+      iex> send("sender", "receiver", 5000, "EUR")
+      {:error, :not_enough_money}
+
+      iex> send("sender", "receiver", 5000, "NON_EXISTING_CURRENCY")
+      {:error, :not_enough_money}
+
+      iex> send("sender", "receiver", "500", "EUR")
+      {:error, :wrong_arguments}
+
   """
+  @spec send(from_user :: user, to_user :: user, amount, currency) ::
+          {:ok, from_user_balance :: number, to_user_balance :: number} | send_error
   def send(from_user, to_user, amount, currency)
       when is_valid_user(from_user) and is_valid_user(to_user) and
              is_valid_amount(amount, currency) do
