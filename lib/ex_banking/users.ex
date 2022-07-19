@@ -5,7 +5,7 @@ defmodule ExBanking.Users do
   alias ExBanking.{UserManager, UserRegistry}
   alias ExBanking.Users.UserSupervisor
 
-  defguard is_valid_user(user) when is_binary(user) and user != ""
+  defguard is_non_empty_string(string) when is_binary(string) and string != ""
 
   defp create_user_supervisor_process(user),
     do: DynamicSupervisor.start_child(UserManager, {UserSupervisor, user})
@@ -30,7 +30,7 @@ defmodule ExBanking.Users do
   """
   @spec create_user(user :: String.t()) ::
           {:ok, pid} | {:error, :wrong_arguments | :user_already_exists}
-  def create_user(user) when is_valid_user(user) do
+  def create_user(user) when is_non_empty_string(user) do
     case create_user_supervisor_process(user) do
       {:ok, pid} ->
         {:ok, pid}
@@ -62,7 +62,7 @@ defmodule ExBanking.Users do
   """
   @spec get_user_pid(user :: String.t()) ::
           {:ok, pid | nil} | {:error, :wrong_arguments}
-  def get_user_pid(user) when is_valid_user(user) do
+  def get_user_pid(user) when is_non_empty_string(user) do
     case Registry.lookup(UserRegistry, user) do
       [] -> {:ok, nil}
       [{pid, _}] -> {:ok, pid}

@@ -227,8 +227,8 @@ defmodule ExBanking do
            {:does_sender_exist, Users.get_user_pid(from_user)},
          {:does_receiver_exist, {:ok, pid}} when is_pid(pid) <-
            {:does_receiver_exist, Users.get_user_pid(to_user)},
-         {:send_balance, {:ok, sender_new_balance, receiver_new_balance}} <-
-           {:send_balance, Accounts.send(from_user, to_user, amount, currency)} do
+         {:send, {:ok, sender_new_balance, receiver_new_balance}} <-
+           {:send, Accounts.send(from_user, to_user, amount, currency)} do
       {:ok, sender_new_balance, receiver_new_balance}
     else
       {:does_sender_exist, {:ok, nil}} ->
@@ -237,7 +237,7 @@ defmodule ExBanking do
       {:does_receiver_exist, {:ok, nil}} ->
         {:error, :receiver_does_not_exist}
 
-      {:send_balance, error} ->
+      {:send, error} ->
         error
 
       _ ->

@@ -29,8 +29,7 @@ defmodule ExBanking.Accounts do
            | :too_many_requests_to_sender
            | :too_many_requests_to_receiver}
 
-  defguard is_valid_user(user) when is_binary(user) and user != ""
-  defguard is_valid_currency(currency) when is_binary(currency) and currency != ""
+  defguard is_non_empty_string(string) when is_binary(string) and string != ""
 
   defguard is_valid_amount(amount, currency)
            when is_number(amount) and amount >= 0 and is_binary(currency) and currency != ""
@@ -61,7 +60,7 @@ defmodule ExBanking.Accounts do
   """
   @spec deposit(user, amount, currency) :: {:ok, new_balance :: number} | deposit_error
   def deposit(user, amount, currency)
-      when is_valid_user(user) and is_valid_amount(amount, currency) do
+      when is_non_empty_string(user) and is_valid_amount(amount, currency) do
     with {:ensure_currency_account_exists, _} <-
            {:ensure_currency_account_exists, create_account_supervisor_process(user, currency)},
          {:enqueue_operation, {:ok, _}} <-
@@ -76,6 +75,7 @@ defmodule ExBanking.Accounts do
         {:error, :too_many_requests_to_user}
 
       {:deposit, error} ->
+        User.dequeue_operation(user)
         error
     end
   end
@@ -104,7 +104,7 @@ defmodule ExBanking.Accounts do
   """
   @spec withdraw(user, amount, currency) :: {:ok, new_balance :: number} | withdraw_error
   def withdraw(user, amount, currency)
-      when is_valid_user(user) and is_valid_amount(amount, currency) do
+      when is_non_empty_string(user) and is_valid_amount(amount, currency) do
     with {:ensure_currency_account_exists, _} <-
            {:ensure_currency_account_exists, create_account_supervisor_process(user, currency)},
          {:enqueue_operation, {:ok, _}} <-
@@ -119,6 +119,7 @@ defmodule ExBanking.Accounts do
         {:error, :too_many_requests_to_user}
 
       {:withdraw, error} ->
+        User.dequeue_operation(user)
         error
     end
   end
@@ -143,7 +144,7 @@ defmodule ExBanking.Accounts do
   """
   @spec get_balance(user, currency) :: {:ok, new_balance :: number} | get_balance_error
   def get_balance(user, currency)
-      when is_valid_user(user) and is_valid_currency(currency) do
+      when is_non_empty_string(user) and is_non_empty_string(currency) do
     with {:enqueue_operation, {:ok, _}} <-
            {:enqueue_operation, User.enqueue_operation(user)},
          {:does_account_exists, true} <-
@@ -158,9 +159,11 @@ defmodule ExBanking.Accounts do
         {:error, :too_many_requests_to_user}
 
       {:does_account_exists, false} ->
+        User.dequeue_operation(user)
         {:ok, 0.0}
 
       {:get_balance, error} ->
+        User.dequeue_operation(user)
         error
     end
   end
@@ -190,7 +193,7 @@ defmodule ExBanking.Accounts do
   @spec send(from_user :: user, to_user :: user, amount, currency) ::
           {:ok, from_user_balance :: number, to_user_balance :: number} | send_error
   def send(from_user, to_user, amount, currency)
-      when is_valid_user(from_user) and is_valid_user(to_user) and
+      when is_non_empty_string(from_user) and is_non_empty_string(to_user) and
              is_valid_amount(amount, currency) do
     with {:enqueue_from_user_operation, {:ok, _}} <-
            {:enqueue_from_user_operation, User.enqueue_operation(from_user)},
@@ -217,9 +220,13 @@ defmodule ExBanking.Accounts do
         {:error, :too_many_requests_to_receiver}
 
       {:withdraw_sender, error} ->
+        User.dequeue_operation(from_user)
+        User.dequeue_operation(to_user)
         error
 
       {:deposit_receiver, error} ->
+        User.dequeue_operation(from_user)
+        User.dequeue_operation(to_user)
         error
     end
   end
