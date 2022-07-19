@@ -64,6 +64,7 @@ defmodule ExBankingTest do
 
     test "should increase balance according to the input currency" do
       ExBanking.create_user("test_deposit_1")
+
       assert {:ok, 500.50} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
       assert {:ok, 1001.0} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
       assert {:ok, 2001.0} = ExBanking.deposit("test_deposit_1", 1000, "EUR")
@@ -73,23 +74,38 @@ defmodule ExBankingTest do
 
     test "should be able to deposit 0 amount" do
       ExBanking.create_user("test_deposit_0")
+
       assert {:ok, 0.0} = ExBanking.deposit("test_deposit_0", 0, "EUR")
       assert {:ok, 0.0} = ExBanking.get_balance("test_deposit_0", "EUR")
     end
 
     test "should return balance with a precision of 2 decimal places" do
       ExBanking.create_user("test_deposit_2")
+
       assert {:ok, 500.50} = ExBanking.deposit("test_deposit_2", 500.501, "EUR")
     end
 
     test "should always down round the new balance" do
       ExBanking.create_user("test_deposit_3")
+
       assert {:ok, 500.12} = ExBanking.deposit("test_deposit_3", 500.129, "EUR")
     end
 
     test "should be able to process no more than 10 deposits at the same time for a single user" do
       ExBanking.create_user("test_deposit_4")
 
+      # test single currency
+      results =
+        1..15
+        |> Enum.map(fn _ ->
+          Task.async(fn -> ExBanking.deposit("test_deposit_4", 1, "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 5
+      assert {:ok, 10.0} = ExBanking.get_balance("test_deposit_4", "EUR")
+
+      # test multiple currencies
       results =
         1..15
         |> Enum.map(fn i ->
@@ -104,6 +120,21 @@ defmodule ExBankingTest do
       ExBanking.create_user("1")
       ExBanking.create_user("2")
 
+      # test single currency
+      results =
+        for user <- 1..2, _ <- 1..15 do
+          {Integer.to_string(user), "EUR"}
+        end
+        |> Enum.map(fn {user, currency} ->
+          Task.async(fn -> ExBanking.deposit(user, 1, currency) end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 10
+      assert {:ok, 10.0} = ExBanking.get_balance("1", "EUR")
+      assert {:ok, 10.0} = ExBanking.get_balance("2", "EUR")
+
+      # test multiple currencies
       results =
         for user <- 1..2, currency <- 1..15 do
           {Integer.to_string(user), Integer.to_string(currency)}
@@ -167,11 +198,13 @@ defmodule ExBankingTest do
     test "should return {:error, :not_enough_money} when user does not have enough balance" do
       ExBanking.create_user("broke_user")
       ExBanking.deposit("broke_user", 500.255, "EUR")
+
       assert {:error, :not_enough_money} = ExBanking.withdraw("broke_user", 10000, "EUR")
     end
 
     test "should return {:error, :not_enough_money} when user does not have an account with the related currency" do
       ExBanking.create_user("poly")
+
       assert {:error, :not_enough_money} = ExBanking.withdraw("poly", 20, "EUR")
     end
 
@@ -179,6 +212,7 @@ defmodule ExBankingTest do
       ExBanking.create_user("test_withdraw_1")
       ExBanking.deposit("test_withdraw_1", 1000, "EUR")
       ExBanking.deposit("test_withdraw_1", 1000, "IDR")
+
       assert {:ok, 800.0} = ExBanking.withdraw("test_withdraw_1", 200, "EUR")
       assert {:ok, 700.0} = ExBanking.withdraw("test_withdraw_1", 100, "EUR")
       assert {:ok, 650.0} = ExBanking.withdraw("test_withdraw_1", 50, "EUR")
@@ -188,29 +222,46 @@ defmodule ExBankingTest do
     test "should be able to withdraw 0 amount" do
       ExBanking.create_user("test_withdraw_0")
       ExBanking.deposit("test_withdraw_0", 1000, "EUR")
+
       assert {:ok, 1000.0} = ExBanking.withdraw("test_withdraw_0", 0, "EUR")
     end
 
     test "should be able to withdraw 0 amount even if the currency does not exists yet" do
       ExBanking.create_user("test_withdraw_without_account")
+
       assert {:ok, 0.0} = ExBanking.withdraw("test_withdraw_without_account", 0, "EUR")
     end
 
     test "should return balance with a precision of 2 decimal places" do
       ExBanking.create_user("test_withdraw_2")
       ExBanking.deposit("test_withdraw_2", 1000.501, "EUR")
+
       assert {:ok, 500.50} = ExBanking.withdraw("test_withdraw_2", 500, "EUR")
     end
 
     test "should always down round the new balance" do
       ExBanking.create_user("test_withdraw_3")
       ExBanking.deposit("test_withdraw_3", 1000.509, "EUR")
+
       assert {:ok, 500.50} = ExBanking.withdraw("test_withdraw_3", 500, "EUR")
     end
 
     test "should be able to process no more than 10 withdraws at the same time for a single user" do
       ExBanking.create_user("test_withdraw_4")
+      ExBanking.deposit("test_withdraw_4", 100, "EUR")
 
+      # test single currency
+      results =
+        1..15
+        |> Enum.map(fn _ ->
+          Task.async(fn -> ExBanking.withdraw("test_withdraw_4", 1, "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 5
+      assert {:ok, 90.0} = ExBanking.get_balance("test_withdraw_4", "EUR")
+
+      # test multiple currencies
       results =
         1..15
         |> Enum.map(fn i ->
@@ -224,7 +275,24 @@ defmodule ExBankingTest do
     test "should be able to processs withdraw for different users at the same time" do
       ExBanking.create_user("3")
       ExBanking.create_user("4")
+      ExBanking.deposit("3", 100, "EUR")
+      ExBanking.deposit("4", 100, "EUR")
 
+      # test single currency
+      results =
+        for user <- 3..4, _ <- 1..15 do
+          {Integer.to_string(user), "EUR"}
+        end
+        |> Enum.map(fn {user, currency} ->
+          Task.async(fn -> ExBanking.withdraw(user, 1, currency) end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 10
+      assert {:ok, 90.0} = ExBanking.get_balance("3", "EUR")
+      assert {:ok, 90.0} = ExBanking.get_balance("4", "EUR")
+
+      # test multiple currencies
       results =
         for user <- 3..4, currency <- 1..15 do
           {Integer.to_string(user), Integer.to_string(currency)}
@@ -279,17 +347,20 @@ defmodule ExBankingTest do
     test "should return balance with a precision of 2 decimal places" do
       ExBanking.create_user("user_1")
       ExBanking.deposit("user_1", 500.123, "EUR")
+
       assert {:ok, 500.12} = ExBanking.get_balance("user_1", "EUR")
     end
 
     test "should always down round the returned balance" do
       ExBanking.create_user("user_2")
       ExBanking.deposit("user_2", 500.129, "EUR")
+
       assert {:ok, 500.12} = ExBanking.get_balance("user_2", "EUR")
     end
 
     test "should return 0 when user does not have an account with the related currency" do
       ExBanking.create_user("abc")
+
       assert {:ok, 0.0} = ExBanking.get_balance("abc", "EUR")
     end
 
@@ -348,6 +419,7 @@ defmodule ExBankingTest do
 
     test "should return {:error, :wrong_arguments} when to_user argument is non binary" do
       ExBanking.create_user("from_user_1")
+
       assert {:error, :wrong_arguments} = ExBanking.send("from_user_1", 1, 500.123, "EUR")
       assert {:error, :wrong_arguments} = ExBanking.send("from_user_1", 1.15, 500.123, "EUR")
       assert {:error, :wrong_arguments} = ExBanking.send("from_user_1", :atom, 500.123, "EUR")
@@ -359,6 +431,7 @@ defmodule ExBankingTest do
     test "should return {:error, :wrong_arguments} when amount argument is non number" do
       ExBanking.create_user("from_user_2")
       ExBanking.create_user("to_user_2")
+
       assert {:error, :wrong_arguments} = ExBanking.send("from_user_2", "to_user_2", "500", "EUR")
 
       assert {:error, :wrong_arguments} =
@@ -373,6 +446,7 @@ defmodule ExBankingTest do
     test "should return {:error, :wrong_arguments} when currency argument is non binary" do
       ExBanking.create_user("from_user_3")
       ExBanking.create_user("to_user_3")
+
       assert {:error, :wrong_arguments} = ExBanking.send("from_user_3", "to_user_3", 500.123, 1)
 
       assert {:error, :wrong_arguments} =
@@ -401,6 +475,7 @@ defmodule ExBankingTest do
     test "should return {:error, :not_enough_money} when sender does not have anough balance" do
       ExBanking.create_user("from_user_5")
       ExBanking.create_user("to_user_5")
+
       ExBanking.deposit("from_user_5", 500, "EUR")
 
       assert {:error, :not_enough_money} = ExBanking.send("from_user_5", "to_user_5", 1000, "EUR")
@@ -416,19 +491,23 @@ defmodule ExBankingTest do
     test "should be able to send 0 amount" do
       ExBanking.create_user("from_user_0")
       ExBanking.create_user("to_user_0")
+
       ExBanking.deposit("from_user_0", 1000, "EUR")
+
       assert {:ok, 1000.0, 0.0} = ExBanking.send("from_user_0", "to_user_0", 0, "EUR")
     end
 
     test "should be able to send 0 amount even if the sender account does not exist yet" do
       ExBanking.create_user("from_user_0a")
       ExBanking.create_user("to_user_0a")
+
       assert {:ok, 0.0, 0.0} = ExBanking.send("from_user_0a", "to_user_0a", 0, "EUR")
     end
 
     test "should return {:error, :too_many_requests_to_sender} if sender has more than 10 send request at the same time" do
       ExBanking.create_user("sender_1a")
       ExBanking.deposit("sender_1a", 50, "EUR")
+
       ExBanking.create_user("receiver_1a")
       ExBanking.create_user("receiver_2a")
 
@@ -442,14 +521,19 @@ defmodule ExBankingTest do
         |> Enum.map(&Task.await/1)
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_sender})) == 10
-      assert {:ok, 40.0} = ExBanking.get_balance("sender_1a", "EUR")
+      assert {:ok, 40.0 = sender_balance} = ExBanking.get_balance("sender_1a", "EUR")
+      assert {:ok, receiver_1_balance} = ExBanking.get_balance("receiver_1a", "EUR")
+      assert {:ok, receiver_2_balance} = ExBanking.get_balance("receiver_2a", "EUR")
+      assert 50.0 == sender_balance + receiver_1_balance + receiver_2_balance
     end
 
     test "should return {:error, :too_many_requests_to_receiver} if receiver has more than 10 send request at the same time" do
       ExBanking.create_user("sender_1b")
       ExBanking.deposit("sender_1b", 50, "EUR")
+
       ExBanking.create_user("sender_2b")
       ExBanking.deposit("sender_2b", 50, "EUR")
+
       ExBanking.create_user("receiver_1b")
 
       results =
@@ -462,17 +546,21 @@ defmodule ExBankingTest do
         |> Enum.map(&Task.await/1)
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_receiver})) == 10
-      assert {:ok, 10.0} = ExBanking.get_balance("receiver_1b", "EUR")
+      assert {:ok, 10.0 = receiver_balance} = ExBanking.get_balance("receiver_1b", "EUR")
+      assert {:ok, sender_1_balance} = ExBanking.get_balance("sender_1b", "EUR")
+      assert {:ok, sender_2_balance} = ExBanking.get_balance("sender_2b", "EUR")
+      assert 100.0 == sender_1_balance + sender_2_balance + receiver_balance
     end
 
     test "should be able to withstand burst request" do
       ExBanking.create_user("sender_1a_burst")
       ExBanking.deposit("sender_1a_burst", 50, "EUR")
-      ExBanking.create_user("receiver_1a")
-      ExBanking.create_user("receiver_2a")
+
+      ExBanking.create_user("receiver_1a_burst")
+      ExBanking.create_user("receiver_2a_burst")
 
       results =
-        for receiver <- ["receiver_1a", "receiver_2a"], _ <- 1..10 do
+        for receiver <- ["receiver_1a_burst", "receiver_2a_burst"], _ <- 1..100 do
           receiver
         end
         |> Enum.map(fn receiver ->
@@ -481,7 +569,10 @@ defmodule ExBankingTest do
         |> Enum.map(&Task.await/1)
 
       assert Enum.count(results, &(&1 != {:error, :too_many_requests_to_sender})) == 10
-      assert {:ok, 40.0} = ExBanking.get_balance("sender_1a_burst", "EUR")
+      assert {:ok, 40.0 = sender_balance} = ExBanking.get_balance("sender_1a_burst", "EUR")
+      assert {:ok, receiver_1_balance} = ExBanking.get_balance("receiver_1a_burst", "EUR")
+      assert {:ok, receiver_2_balance} = ExBanking.get_balance("receiver_2a_burst", "EUR")
+      assert 50.0 == sender_balance + receiver_1_balance + receiver_2_balance
     end
   end
 end
