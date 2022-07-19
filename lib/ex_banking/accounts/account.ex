@@ -112,6 +112,8 @@ defmodule ExBanking.Accounts.Account do
   """
   @spec does_account_exist?(user, currency) :: boolean()
   def does_account_exist?(user, currency) do
+    :timer.sleep(@processtime)
+
     case Registry.lookup(AccountRegistry, "#{user}:#{currency}") do
       [] -> false
       _ -> true
