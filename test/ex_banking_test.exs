@@ -115,6 +115,20 @@ defmodule ExBankingTest do
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 10
     end
+
+    test "should be able to withstand burst request" do
+      ExBanking.create_user("deposit_burst")
+
+      results =
+        1..100
+        |> Enum.map(fn _ ->
+          Task.async(fn -> ExBanking.deposit("deposit_burst", 1, "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 != {:error, :too_many_requests_to_user})) == 10
+      assert {:ok, 10.0} = ExBanking.get_balance("deposit_burst", "EUR")
+    end
   end
 
   describe "withdraw/3" do
@@ -222,6 +236,21 @@ defmodule ExBankingTest do
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 10
     end
+
+    test "should be able to withstand burst request" do
+      ExBanking.create_user("withdraw_burst")
+      ExBanking.deposit("withdraw_burst", 100, "EUR")
+
+      results =
+        1..100
+        |> Enum.map(fn _ ->
+          Task.async(fn -> ExBanking.withdraw("withdraw_burst", 1, "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 != {:error, :too_many_requests_to_user})) == 10
+      assert {:ok, 90.0} = ExBanking.get_balance("withdraw_burst", "EUR")
+    end
   end
 
   describe "get_balance/2" do
@@ -291,6 +320,19 @@ defmodule ExBankingTest do
         |> Enum.map(&Task.await/1)
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_user})) == 10
+    end
+
+    test "should be able to withstand burst request" do
+      ExBanking.create_user("get_balance_burst")
+
+      results =
+        1..100
+        |> Enum.map(fn _ ->
+          Task.async(fn -> ExBanking.get_balance("get_balance_burst", "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 != {:error, :too_many_requests_to_user})) == 10
     end
   end
 
@@ -421,6 +463,25 @@ defmodule ExBankingTest do
 
       assert Enum.count(results, &(&1 == {:error, :too_many_requests_to_receiver})) == 10
       assert {:ok, 10.0} = ExBanking.get_balance("receiver_1b", "EUR")
+    end
+
+    test "should be able to withstand burst request" do
+      ExBanking.create_user("sender_1a_burst")
+      ExBanking.deposit("sender_1a_burst", 50, "EUR")
+      ExBanking.create_user("receiver_1a")
+      ExBanking.create_user("receiver_2a")
+
+      results =
+        for receiver <- ["receiver_1a", "receiver_2a"], _ <- 1..10 do
+          receiver
+        end
+        |> Enum.map(fn receiver ->
+          Task.async(fn -> ExBanking.send("sender_1a_burst", receiver, 1, "EUR") end)
+        end)
+        |> Enum.map(&Task.await/1)
+
+      assert Enum.count(results, &(&1 != {:error, :too_many_requests_to_sender})) == 10
+      assert {:ok, 40.0} = ExBanking.get_balance("sender_1a_burst", "EUR")
     end
   end
 end
