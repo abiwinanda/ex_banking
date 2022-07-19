@@ -106,11 +106,11 @@ defmodule ExBanking do
       {:does_user_exist, {:ok, nil}} ->
         {:error, :user_does_not_exist}
 
-      {:does_user_exist, error} ->
-        error
-
       {:deposit, error} ->
         error
+
+      _ ->
+        {:error, :wrong_arguments}
     end
   end
 
@@ -148,11 +148,11 @@ defmodule ExBanking do
       {:does_user_exist, {:ok, nil}} ->
         {:error, :user_does_not_exist}
 
-      {:does_user_exist, error} ->
-        error
-
       {:withdraw, error} ->
         error
+
+      _ ->
+        {:error, :wrong_arguments}
     end
   end
 
@@ -186,11 +186,11 @@ defmodule ExBanking do
       {:does_user_exist, {:ok, nil}} ->
         {:error, :user_does_not_exist}
 
-      {:does_user_exist, error} ->
-        error
-
       {:get_balance, error} ->
         error
+
+      _ ->
+        {:error, :wrong_arguments}
     end
   end
 
@@ -234,17 +234,14 @@ defmodule ExBanking do
       {:does_sender_exist, {:ok, nil}} ->
         {:error, :sender_does_not_exist}
 
-      {:does_sender_exist, error} ->
-        error
-
       {:does_receiver_exist, {:ok, nil}} ->
         {:error, :receiver_does_not_exist}
 
-      {:does_receiver_exist, error} ->
-        error
-
       {:send_balance, error} ->
         error
+
+      _ ->
+        {:error, :wrong_arguments}
     end
   end
 end
