@@ -33,7 +33,7 @@ defmodule ExBanking.Accounts do
   defguard is_valid_currency(currency) when is_binary(currency) and currency != ""
 
   defguard is_valid_amount(amount, currency)
-           when is_number(amount) and amount > 0 and is_binary(currency) and currency != ""
+           when is_number(amount) and amount >= 0 and is_binary(currency) and currency != ""
 
   defp create_account_supervisor_process(user, currency),
     do:
@@ -105,10 +105,10 @@ defmodule ExBanking.Accounts do
   @spec withdraw(user, amount, currency) :: {:ok, new_balance :: number} | withdraw_error
   def withdraw(user, amount, currency)
       when is_valid_user(user) and is_valid_amount(amount, currency) do
-    with {:enqueue_operation, {:ok, _}} <-
+    with {:ensure_currency_account_exists, _} <-
+           {:ensure_currency_account_exists, create_account_supervisor_process(user, currency)},
+         {:enqueue_operation, {:ok, _}} <-
            {:enqueue_operation, User.enqueue_operation(user)},
-         {:does_account_exists, true} <-
-           {:does_account_exists, Account.does_account_exist?(user, currency)},
          {:withdraw, {:ok, new_balance}} <-
            {:withdraw, Account.withdraw(user, amount, currency)},
          {:dequeue_operation, {:ok, _}} <-
@@ -117,9 +117,6 @@ defmodule ExBanking.Accounts do
     else
       {:enqueue_operation, _} ->
         {:error, :too_many_requests_to_user}
-
-      {:does_account_exists, false} ->
-        {:error, :not_enough_money}
 
       {:withdraw, error} ->
         error
@@ -161,7 +158,7 @@ defmodule ExBanking.Accounts do
         {:error, :too_many_requests_to_user}
 
       {:does_account_exists, false} ->
-        {:ok, 0}
+        {:ok, 0.0}
 
       {:get_balance, error} ->
         error

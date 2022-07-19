@@ -64,21 +64,27 @@ defmodule ExBankingTest do
 
     test "should increase balance according to the input currency" do
       ExBanking.create_user("test_deposit_1")
-      {:ok, 500.50} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
-      {:ok, 1001.0} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
-      {:ok, 2001.0} = ExBanking.deposit("test_deposit_1", 1000, "EUR")
-      {:ok, 123.12} = ExBanking.deposit("test_deposit_1", 123.12, "IDR")
-      {:ok, 2001.0} = ExBanking.get_balance("test_deposit_1", "EUR")
+      assert {:ok, 500.50} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
+      assert {:ok, 1001.0} = ExBanking.deposit("test_deposit_1", 500.50, "EUR")
+      assert {:ok, 2001.0} = ExBanking.deposit("test_deposit_1", 1000, "EUR")
+      assert {:ok, 123.12} = ExBanking.deposit("test_deposit_1", 123.12, "IDR")
+      assert {:ok, 2001.0} = ExBanking.get_balance("test_deposit_1", "EUR")
+    end
+
+    test "should be able to deposit 0 amount" do
+      ExBanking.create_user("test_deposit_0")
+      assert {:ok, 0.0} = ExBanking.deposit("test_deposit_0", 0, "EUR")
+      assert {:ok, 0.0} = ExBanking.get_balance("test_deposit_0", "EUR")
     end
 
     test "should return balance with a precision of 2 decimal places" do
       ExBanking.create_user("test_deposit_2")
-      {:ok, 500.50} = ExBanking.deposit("test_deposit_2", 500.501, "EUR")
+      assert {:ok, 500.50} = ExBanking.deposit("test_deposit_2", 500.501, "EUR")
     end
 
     test "should always down round the new balance" do
       ExBanking.create_user("test_deposit_3")
-      {:ok, 500.12} = ExBanking.deposit("test_deposit_3", 500.129, "EUR")
+      assert {:ok, 500.12} = ExBanking.deposit("test_deposit_3", 500.129, "EUR")
     end
 
     test "should be able to process no more than 10 deposits at the same time for a single user" do
@@ -159,22 +165,33 @@ defmodule ExBankingTest do
       ExBanking.create_user("test_withdraw_1")
       ExBanking.deposit("test_withdraw_1", 1000, "EUR")
       ExBanking.deposit("test_withdraw_1", 1000, "IDR")
-      {:ok, 800.0} = ExBanking.withdraw("test_withdraw_1", 200, "EUR")
-      {:ok, 700.0} = ExBanking.withdraw("test_withdraw_1", 100, "EUR")
-      {:ok, 650.0} = ExBanking.withdraw("test_withdraw_1", 50, "EUR")
-      {:ok, 990.0} = ExBanking.withdraw("test_withdraw_1", 10, "IDR")
+      assert {:ok, 800.0} = ExBanking.withdraw("test_withdraw_1", 200, "EUR")
+      assert {:ok, 700.0} = ExBanking.withdraw("test_withdraw_1", 100, "EUR")
+      assert {:ok, 650.0} = ExBanking.withdraw("test_withdraw_1", 50, "EUR")
+      assert {:ok, 990.0} = ExBanking.withdraw("test_withdraw_1", 10, "IDR")
+    end
+
+    test "should be able to withdraw 0 amount" do
+      ExBanking.create_user("test_withdraw_0")
+      ExBanking.deposit("test_withdraw_0", 1000, "EUR")
+      assert {:ok, 1000.0} = ExBanking.withdraw("test_withdraw_0", 0, "EUR")
+    end
+
+    test "should be able to withdraw 0 amount even if the currency does not exists yet" do
+      ExBanking.create_user("test_withdraw_without_account")
+      assert {:ok, 0.0} = ExBanking.withdraw("test_withdraw_without_account", 0, "EUR")
     end
 
     test "should return balance with a precision of 2 decimal places" do
       ExBanking.create_user("test_withdraw_2")
       ExBanking.deposit("test_withdraw_2", 1000.501, "EUR")
-      {:ok, 500.50} = ExBanking.withdraw("test_withdraw_2", 500, "EUR")
+      assert {:ok, 500.50} = ExBanking.withdraw("test_withdraw_2", 500, "EUR")
     end
 
     test "should always down round the new balance" do
       ExBanking.create_user("test_withdraw_3")
       ExBanking.deposit("test_withdraw_3", 1000.509, "EUR")
-      {:ok, 500.50} = ExBanking.withdraw("test_withdraw_3", 500, "EUR")
+      assert {:ok, 500.50} = ExBanking.withdraw("test_withdraw_3", 500, "EUR")
     end
 
     test "should be able to process no more than 10 withdraws at the same time for a single user" do
@@ -244,7 +261,7 @@ defmodule ExBankingTest do
 
     test "should return 0 when user does not have an account with the related currency" do
       ExBanking.create_user("abc")
-      assert {:ok, 0} = ExBanking.get_balance("abc", "EUR")
+      assert {:ok, 0.0} = ExBanking.get_balance("abc", "EUR")
     end
 
     test "should be able to process no more than 10 get balance operation at the same time for a single user" do
@@ -352,6 +369,19 @@ defmodule ExBankingTest do
       ExBanking.create_user("to_user_6")
 
       assert {:error, :not_enough_money} = ExBanking.send("from_user_6", "to_user_6", 1000, "USD")
+    end
+
+    test "should be able to send 0 amount" do
+      ExBanking.create_user("from_user_0")
+      ExBanking.create_user("to_user_0")
+      ExBanking.deposit("from_user_0", 1000, "EUR")
+      assert {:ok, 1000.0, 0.0} = ExBanking.send("from_user_0", "to_user_0", 0, "EUR")
+    end
+
+    test "should be able to send 0 amount even if the sender account does not exist yet" do
+      ExBanking.create_user("from_user_0a")
+      ExBanking.create_user("to_user_0a")
+      assert {:ok, 0.0, 0.0} = ExBanking.send("from_user_0a", "to_user_0a", 0, "EUR")
     end
 
     test "should return {:error, :too_many_requests_to_sender} if sender has more than 10 send request at the same time" do
